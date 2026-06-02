@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resize — TS reference</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=" />
+  <style>
+    body {
+      background: #111 0px 0px / 16px url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2" fill="white" fill-opacity="0.025"><rect width="1" height="1" /><rect x="1" y="1" width="1" height="1" /></svg>');
+      font-family: system-ui, sans-serif;
+      color: #ccc;
+      margin: 16px;
+    }
+
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    #controls button {
+      font: inherit;
+      color: inherit;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+
+    #controls button:hover {
+      background: #2c2c2c;
+    }
+
+    #scale-number {
+      width: 6ch;
+    }
+
+    #views {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    figcaption {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+
+    .kernel-select {
+      font: inherit;
+      font-size: 12px;
+      color: inherit;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 2px 4px;
+    }
+
+    /* The output canvases carry straight alpha; this wrapper is the backdrop
+       they composite over, so the dark fringe (or its absence) is visible.
+       Default is transparent — the page background shows through. */
+    .backdrop {
+      display: inline-block;
+    }
+
+    body[data-backdrop="white"] .backdrop { background: #fff; }
+    body[data-backdrop="black"] .backdrop { background: #000; }
+    body[data-backdrop="magenta"] .backdrop { background: #f0f; }
+    body[data-backdrop="checker"] .backdrop {
+      background: #fff 0 0 / 16px url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2" fill="black" fill-opacity="0.18"><rect width="1" height="1" /><rect x="1" y="1" width="1" height="1" /></svg>');
+    }
+
+    canvas {
+      image-rendering: pixelated;
+      vertical-align: top;
+    }
+  </style>
+  <script src="./reference.js" type="module"></script>
+</head>
+<body>
+  <div id="controls">
+    <select id="image-select"></select>
+    <button id="prev-image" type="button" title="Previous image (←)">◀</button>
+    <button id="next-image" type="button" title="Next image (→)">▶</button>
+    <label for="scale-range">Scale</label>
+    <input id="scale-range" type="range" min="0.05" max="1.0" step="0.01" value="0.65" />
+    <input id="scale-number" type="number" min="0.05" max="1.0" step="0.01" value="0.65" />
+    <label><input id="coverage-alpha" type="checkbox" checked /> Coverage-weighted alpha</label>
+    <label for="sharpen-range">Sharpen</label>
+    <input id="sharpen-range" type="range" min="-1" max="1" step="0.05" value="0" />
+    <input id="sharpen-number" type="number" min="-1" max="1" step="0.05" value="0" />
+    <label for="backdrop">Backdrop</label>
+    <select id="backdrop">
+      <option value="transparent">Transparent</option>
+      <option value="white">White</option>
+      <option value="black">Black</option>
+      <option value="magenta">Magenta</option>
+      <option value="checker">Checker</option>
+    </select>
+  </div>
+  <div id="views">
+    <figure>
+      <figcaption>Source</figcaption>
+      <div class="backdrop"><canvas id="canvas-source"></canvas></div>
+    </figure>
+    <figure>
+      <figcaption><select id="kernel-a" class="kernel-select"></select></figcaption>
+      <div class="backdrop"><canvas id="canvas-a"></canvas></div>
+    </figure>
+    <figure>
+      <figcaption><select id="kernel-b" class="kernel-select"></select></figcaption>
+      <div class="backdrop"><canvas id="canvas-b"></canvas></div>
+    </figure>
+  </div>
+</body>
+</html>

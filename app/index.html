@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resize — Wasm worker</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgo=" />
+  <style>
+    body {
+      background: #111 0px 0px / 16px url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2" fill="white" fill-opacity="0.025"><rect width="1" height="1" /><rect x="1" y="1" width="1" height="1" /></svg>');
+      font-family: system-ui, sans-serif;
+      color: #ccc;
+      margin: 16px;
+    }
+
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    #controls button {
+      font: inherit;
+      color: inherit;
+      background: #222;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+
+    #status {
+      font-size: 13px;
+      color: #999;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #views {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    figure {
+      margin: 0;
+    }
+
+    figcaption {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+
+    canvas {
+      image-rendering: pixelated;
+      vertical-align: top;
+    }
+
+    .note {
+      max-width: 60ch;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #aaa;
+    }
+
+    .note code { color: #ccc; }
+
+    a { color: #6cf; }
+  </style>
+  <script src="./main.js" type="module"></script>
+</head>
+<body>
+  <div id="controls">
+    <select id="image-select"></select>
+    <button id="prev-image" type="button" title="Previous image (←)">◀</button>
+    <button id="next-image" type="button" title="Next image (→)">▶</button>
+    <label for="scale-range">Scale</label>
+    <input id="scale-range" type="range" min="0.05" max="1.0" step="0.01" value="0.65" />
+    <input id="scale-number" type="number" min="0.05" max="1.0" step="0.01" value="0.65" />
+    <label for="engine">Engine</label>
+    <select id="engine">
+      <option value="auto-ts">Auto (TS)</option>
+      <option value="auto-wasm">Auto (Wasm)</option>
+      <option value="auto-sab">Auto (SAB)</option>
+      <option value="ts">TypeScript</option>
+      <option value="wasm">Wasm</option>
+      <option value="pool">TS pool</option>
+      <option value="wasm-pool">Wasm pool</option>
+      <option value="sab-pool">SAB pool</option>
+      <option value="browser">Browser (drawImage)</option>
+    </select>
+    <label for="kernel">Kernel</label>
+    <select id="kernel">
+      <option value="lanczos2">Lanczos-2</option>
+      <option value="lanczos3">Lanczos-3</option>
+      <option value="mitchell">Mitchell</option>
+      <option value="triangle">Triangle</option>
+      <option value="box">Box</option>
+    </select>
+    <label for="tile">Tile</label>
+    <select id="tile">
+      <option value="0">Whole image</option>
+      <option value="64">64</option>
+      <option value="128">128</option>
+      <option value="256">256</option>
+      <option value="512">512</option>
+      <option value="1024">1024</option>
+    </select>
+    <label for="size">Size</label>
+    <select id="size" title="Generated-source size">
+      <option value="1024">1024</option>
+      <option value="2048">2048</option>
+      <option value="4096">4096</option>
+      <option value="8192">8192</option>
+    </select>
+    <span id="status">starting…</span>
+  </div>
+  <div id="views">
+    <figure>
+      <figcaption>Worker output</figcaption>
+      <canvas id="canvas-worker"></canvas>
+    </figure>
+  </div>
+</body>
+</html>

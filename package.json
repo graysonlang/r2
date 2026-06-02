@@ -1,0 +1,48 @@
+{
+  "name": "resize",
+  "version": "0.1.0",
+  "private": true,
+  "keywords": [],
+  "homepage": "https://github.com/graysonlang/resize#readme",
+  "bugs": {
+    "url": "https://github.com/graysonlang/resize/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/graysonlang/resize.git"
+  },
+  "license": "MIT",
+  "author": "Grayson Lang",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "node ./scripts/build.mjs --lint --minify",
+    "serve": "node ./scripts/build.mjs --lint --sourcemap --watch --serve --debug-port=9222",
+    "serve:https": "ESP_DEV_CERT_NAME=$npm_package_config_esp_dev_cert_name npm run serve -- --host=0.0.0.0 --port=8443",
+    "dev": "npm run serve -- --proxy --launch",
+    "dev:sab": "npm run serve -- --proxy --launch --cross-origin-isolation",
+    "dev:https": "npm run serve:https -- --proxy --launch",
+    "vscode:build": "npm run build -- --vscode",
+    "vscode:debug": "npm run serve -- --vscode",
+    "vscode:debug:https": "npm run serve:https -- --vscode",
+    "cert:dev": "ESP_DEV_CERT_NAME=$npm_package_config_esp_dev_cert_name esp-generate-dev-cert",
+    "lint": "eslint . --ignore-pattern 'dist'",
+    "typecheck": "tsc --noEmit",
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "serve:sab": "npm run build && node scripts/serve-sab.mjs",
+    "test": "node scripts/test-alpha.mjs && node scripts/test-respawn.mjs && node scripts/test-strategy.mjs",
+    "test:wasm": "node scripts/build-wasm.mjs && node scripts/test-wasm.mjs",
+    "bench:startup": "node scripts/bench-startup.mjs"
+  },
+  "dependencies": {
+    "@graysonlang/esp": "^1.0.0"
+  },
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^9.39.4",
+    "sharp": "^0.34.5",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.0"
+  }
+}
