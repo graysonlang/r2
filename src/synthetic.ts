@@ -16,44 +16,53 @@ export interface ZonePlateOptions {
    */
   gain?: number;
   /**
-   * Number of chirp centers per axis. >1 tiles the zone plate into a grid so
-   * dense high-frequency rings cover the whole frame — including every tile
-   * boundary, where a resampling seam would otherwise be easy to miss. For the
-   * pattern to *actually* tile, the cell period must be an integer number of
-   * pixels, so prefer a `tiles` that divides `size` (e.g. powers of two like 4
-   * on a 4096 image). Non-dividing counts still render but leave a partial
-   * trailing cell rather than a sub-pixel-misaligned (non-tiling) field.
-   * Default 4.
+   * Number of cells per axis. The chirp centers sit on the cell lattice, i.e. at
+   * every multiple of the cell period — so `tiles` cells yield `tiles + 1` centers
+   * per axis (the image corners and edge midpoints included). >1 tiles the zone
+   * plate into a grid so dense high-frequency rings cover the whole frame —
+   * including every tile boundary, where a resampling seam would otherwise be easy
+   * to miss. For the pattern to *actually* tile, the cell period must be an integer
+   * number of pixels, so prefer a `tiles` that divides `size` (e.g. powers of two).
+   * Non-dividing counts still render but leave a partial trailing cell rather than
+   * a sub-pixel-misaligned (non-tiling) field. Default 2 (a 3x3 lattice of centers,
+   * matching assets/zone_plate2.png).
    */
   tiles?: number;
 }
 
 /**
- * Opaque grayscale tiled zone plate, `size`x`size`. Lays out a grid of radial
- * chirp centers spaced an integer `cellSize` apart; brightness =
- * 0.5 + 0.5*cos(k*r^2) where r is the distance to the nearest chirp center, so
- * frequency rises toward each cell's edges. The repeating centers keep dense
+ * Opaque grayscale tiled zone plate, `size`x`size`. Lays out a lattice of radial
+ * chirp centers spaced an integer `cellSize` apart (centers land on the lattice
+ * nodes — multiples of `cellSize` — so they include the image corners and edge
+ * midpoints); brightness = 0.5 + 0.5*cos(k*r^2) where r is the distance to the
+ * nearest chirp center, so frequency rises toward each cell's edges and hits
+ * Nyquist at the half-cell radius. The repeating centers keep dense
  * high-frequency content everywhere (a stronger tiling / aliasing stress than a
  * single center). The value is continuous across cell boundaries (dx^2 symmetry);
- * the diamond creases there are an expected derivative flip, not a seam.
+ * the diamond creases there are an expected derivative flip, not a seam. The
+ * default (tiles=2) reproduces assets/zone_plate2.png.
  */
 // Precomputed chirp parameters for a given image size + options, so a per-pixel
 // sampler can be evaluated cheaply (and shared between the standalone generator
 // and the alpha field).
 function zonePlateParams(size: number, opts: ZonePlateOptions = {}) {
-  const { gain = 1.0, tiles = 1 } = opts;
+  const { gain = 1.0, tiles = 2 } = opts;
   // Integer cell period so the chirp lands on the pixel grid (a non-integer
   // period would not tile). A non-dividing `tiles` leaves a partial last cell.
   const cellSize = Math.max(1, Math.round(size / tiles));
-  // Reference radius = half a cell; scale so the chirp hits Nyquist there.
-  const km = (gain * Math.PI) / (cellSize / 2);
+  // Reference radius = half a cell; scale so the chirp hits Nyquist (0.5 cyc/px,
+  // local freq km*r/pi) exactly at r = cellSize/2.
+  const km = (gain * Math.PI) / cellSize;
   return { cellSize, km };
 }
 
-// Zone-plate value in [0,1] at pixel (x, y), given precomputed params.
+// Zone-plate value in [0,1] at pixel (x, y), given precomputed params. Distance
+// is to the nearest lattice node (multiple of cellSize), so centers fall on the
+// grid — including the image borders — and dx^2 stays continuous across the
+// cell-boundary creases.
 function zonePlateSample(x: number, y: number, cellSize: number, km: number): number {
-  const cx = (Math.floor(x / cellSize) + 0.5) * cellSize;
-  const cy = (Math.floor(y / cellSize) + 0.5) * cellSize;
+  const cx = Math.round(x / cellSize) * cellSize;
+  const cy = Math.round(y / cellSize) * cellSize;
   const dx = x - cx;
   const dy = y - cy;
   return 0.5 + 0.5 * Math.cos(km * (dx * dx + dy * dy));
