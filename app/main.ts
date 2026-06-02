@@ -16,7 +16,6 @@ export const filePaths = { index: indexHtml };
 // `new Worker(new URL(...))`).
 const WORKER_URL = './resizeWorker.js';
 const TILE_WORKER_URL = './tileWorker.js';
-const WASM_TILE_WORKER_URL = './wasmTileWorker.js';
 const SAB_WORKER_URL = './sabWorker.js';
 
 const IMAGE_DIR = 'assets/';
@@ -123,16 +122,15 @@ window.addEventListener('load', () => {
     status.textContent = 'worker ready';
   });
 
-  // Pools are created lazily on first use (each spawns N tile workers). One per
-  // engine — TS tile workers vs Wasm tile workers — behind the same protocol.
-  // Sweet spot from the sweep is workers = hardwareConcurrency (oversubscription
-  // hurts, undersubscription leaves cores idle). No artificial cap — staging cost
-  // doesn't scale with worker count on the pool engines that matter here.
+  // The TS tile-worker pool is created lazily on first use (it spawns N tile
+  // workers). Sweet spot from the sweep is workers = hardwareConcurrency
+  // (oversubscription hurts, undersubscription leaves cores idle). No artificial
+  // cap — staging cost doesn't scale with worker count on the pool engines that
+  // matter here.
   const poolSize = Math.max(2, navigator.hardwareConcurrency || 4);
-  const pools: Partial<Record<'pool' | 'wasm-pool', ResizePool>> = {};
-  function getPool(engine: 'pool' | 'wasm-pool'): ResizePool {
-    return (pools[engine] ??= new ResizePool(
-      engine === 'wasm-pool' ? WASM_TILE_WORKER_URL : TILE_WORKER_URL, poolSize));
+  let pool: ResizePool | null = null;
+  function getPool(): ResizePool {
+    return (pool ??= new ResizePool(TILE_WORKER_URL, poolSize));
   }
 
   // The SAB pool needs cross-origin isolation (COOP/COEP). Lazy + gated.
@@ -194,7 +192,7 @@ window.addEventListener('load', () => {
   // DEMO-ONLY: this is a UI affordance for the interactive slider, not part of
   // the resize contract — it lives in the demo shell, not in ResizeClient /
   // protocol / worker. The intended app (drag-and-drop import) resizes each asset
-  // once to a fixed target, so it never hits this. The real Wasm worker will
+  // once to a fixed target, so it never hits this. A production worker will
   // instead need true *cancellation* (user-abort of an in-flight resize), which
   // is a different mechanism from this coalescing — see protocol cancel message.
   let busy = false;
@@ -258,16 +256,16 @@ window.addEventListener('load', () => {
 
       // Auto engines run the shared routing policy, pinning their kernel family.
       // auto-ts → inline/shrink via single TS worker, pool for large mild.
-      // auto-wasm → same shape, Wasm kernel. auto-sab → pool path uses SAB.
-      if (engine === 'auto-ts' || engine === 'auto-wasm' || engine === 'auto-sab') {
+      // auto-sab → same shape, pool path uses SAB.
+      if (engine === 'auto-ts' || engine === 'auto-sab') {
         const strat = chooseStrategy({
           srcWidth: src.width, srcHeight: src.height, dstWidth, dstHeight,
         });
-        const family = engine === 'auto-wasm' ? 'wasm' : engine === 'auto-sab' ? 'sab' : 'ts';
+        const family = engine === 'auto-sab' ? 'sab' : 'ts';
         if (strat.path === 'pool') {
           // Large + mild → pool. SAB pool when available + requested, else TS pool.
           const useSab = family === 'sab' && SabResizePool.isSupported();
-          const p = useSab ? getSabPool() : getPool('pool');
+          const p = useSab ? getSabPool() : getPool();
           out = await p.resize(src, dstWidth, dstHeight, {
             kernel, coverageWeightedAlpha: true, tileSize: strat.tile,
           });
@@ -280,7 +278,6 @@ window.addEventListener('load', () => {
           const r = await client.resize(src.data, {
             width: src.width, height: src.height, dstWidth, dstHeight,
             kernel, coverageWeightedAlpha: true, tileSize: 0,
-            engine: family === 'wasm' ? 'wasm' : 'ts',
           });
           out = r.pixels;
           note = `auto: ${strat.path}`;
@@ -295,8 +292,8 @@ window.addEventListener('load', () => {
           kernel, coverageWeightedAlpha: true, tileSize: tileSize > 0 ? tileSize : 512,
         });
         note = `sab ${p.size}w, tiled ${tileSize > 0 ? tileSize : 512}`;
-      } else if (engine === 'pool' || engine === 'wasm-pool') {
-        const p = getPool(engine as 'pool' | 'wasm-pool');
+      } else if (engine === 'pool') {
+        const p = getPool();
         out = await p.resize(src, dstWidth, dstHeight, {
           kernel, coverageWeightedAlpha: true, tileSize: tileSize > 0 ? tileSize : 512,
         });
@@ -310,15 +307,14 @@ window.addEventListener('load', () => {
           kernel,
           coverageWeightedAlpha: true,
           tileSize,
-          engine: engine as 'ts' | 'wasm',
         });
         out = r.pixels;
-        // Mirror the worker's routing (resizeWorker handleResize): TS engine uses
-        // shrink-then-reduce at >=4x downscale, else tiled (if tileSize) / whole.
+        // Mirror the worker's routing (resizeWorker handleResize): shrink-then-reduce
+        // at >=4x downscale, else tiled (if tileSize) / whole.
         const heavy = src.width >= dstWidth * 4 && src.height >= dstHeight * 4;
-        if (engine === 'ts' && heavy) {
+        if (heavy) {
           note = 'shrink→reduce';
-        } else if (engine === 'ts' && tileSize > 0) {
+        } else if (tileSize > 0) {
           note = `tiled ${tileSize}`;
         } else {
           note = 'whole image';

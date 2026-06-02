@@ -3,10 +3,9 @@ import tseslint from 'typescript-eslint';
 
 export default [
   {
-    // `old/` is the untouched reference port; `dist*/` is build output
-    // (dist-wasm/ holds emcc-generated JS we don't lint). run-bench.mjs is a
-    // dev-only headless-Chrome driver with dense CDP plumbing — not shipped.
-    ignores: ['dist/**', 'dist-wasm/**', 'old/**', 'scripts/run-bench.mjs'],
+    // `old/` is the untouched reference port; `dist/` is build output. run-bench.mjs
+    // is a dev-only headless-Chrome driver with dense CDP plumbing — not shipped.
+    ignores: ['dist/**', 'old/**', 'scripts/run-bench.mjs'],
   },
   stylistic.configs.customize({
     indent: 2,

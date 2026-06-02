@@ -28,10 +28,8 @@
     "cert:dev": "ESP_DEV_CERT_NAME=$npm_package_config_esp_dev_cert_name esp-generate-dev-cert",
     "lint": "eslint . --ignore-pattern 'dist'",
     "typecheck": "tsc --noEmit",
-    "build:wasm": "node scripts/build-wasm.mjs",
     "serve:sab": "npm run build && node scripts/serve-sab.mjs",
     "test": "node scripts/test-alpha.mjs && node scripts/test-respawn.mjs && node scripts/test-strategy.mjs",
-    "test:wasm": "node scripts/build-wasm.mjs && node scripts/test-wasm.mjs",
     "bench:startup": "node scripts/bench-startup.mjs"
   },
   "dependencies": {

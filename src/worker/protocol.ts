@@ -4,15 +4,11 @@
 // that avoids the module-worker dropped-message race), then answers each
 // `resize` request with a matching `result` (or `error`) carrying the same id.
 //
-// This is the Phase-3 worker boundary. The kernel behind it currently runs the
-// TS reference resampler (src/separable.ts) inside the worker; the Wasm/SIMD
-// Lanczos-2 kernel drops in behind this same protocol later — see
+// This is the Phase-3 worker boundary. The kernel behind it runs the TS
+// reference resampler (src/separable.ts) inside the worker — see
 // tiled-scaler-plan.md.
 
 import type { KernelName } from '../separable';
-
-/** Which resampler implementation the worker should run. */
-export type ResizeEngine = 'ts' | 'wasm';
 
 export interface ResizeParams {
   readonly width: number;
@@ -24,12 +20,9 @@ export interface ResizeParams {
   /**
    * Output tile size for the in-worker tiled resampler. 0 (or omitted) resizes
    * the whole image in one pass. Any positive size yields bit-identical output —
-   * tiling is a cache/memory decomposition, not a quality knob. (TS engine only;
-   * the Wasm kernel is whole-image until its own tiling lands.)
+   * tiling is a cache/memory decomposition, not a quality knob.
    */
   readonly tileSize?: number;
-  /** Resampler implementation; defaults to 'ts' when omitted. */
-  readonly engine?: ResizeEngine;
 }
 
 // --- Main thread -> worker ---

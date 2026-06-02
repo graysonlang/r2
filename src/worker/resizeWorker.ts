@@ -1,14 +1,12 @@
 // Resize worker.
 //
 // Establishes the message protocol and lifecycle for the Phase-3 resizer and
-// runs the actual resample. The kernel is currently the TS reference resampler
-// (src/separable.ts) executed in the worker; the Wasm/SIMD Lanczos-2 kernel
-// drops in behind this same protocol later. See src/worker/protocol.ts.
+// runs the actual resample. The kernel is the TS reference resampler
+// (src/separable.ts) executed in the worker. See src/worker/protocol.ts.
 
 /// <reference lib="webworker" />
 
 import { resizeSeparable, resizeSeparableTiled, resizeThumbnail } from '../separable';
-import { loadResizeWasm, resizeWasm } from '../wasm/resizeWasm';
 import type { DecodeResizeRequest, ResizeRequest, WorkerRequest, WorkerResponse } from './protocol';
 
 function post(message: WorkerResponse, transfer: Transferable[] = []): void {
@@ -17,7 +15,7 @@ function post(message: WorkerResponse, transfer: Transferable[] = []): void {
 
 async function handleResize(request: ResizeRequest): Promise<void> {
   const { id, params, pixels } = request;
-  const { width, height, dstWidth, dstHeight, kernel, coverageWeightedAlpha, tileSize, engine } = params;
+  const { width, height, dstWidth, dstHeight, kernel, coverageWeightedAlpha, tileSize } = params;
 
   if (pixels.byteLength < width * height * 4) {
     post({ type: 'error', id, message: 'Source buffer too small for dimensions.' });
@@ -28,33 +26,26 @@ async function handleResize(request: ResizeRequest): Promise<void> {
     const data = new Uint8ClampedArray(pixels);
     const opts = { kernel, coverageWeightedAlpha };
     let out: Uint8ClampedArray<ArrayBuffer>;
-    if (engine === 'wasm') {
-      const mod = await loadResizeWasm();
-      out = resizeWasm(mod, data, width, height, dstWidth, dstHeight, {
-        kernel, coverageWeightedAlpha, sRGBGamma: true, gamma: 2.2,
-      });
+    const src = { data, width, height };
+    // Pure separable Lanczos cost is dominated by the horizontal pass reading
+    // every SOURCE pixel (taps grow as scale shrinks → cost plateaus at heavy
+    // downscale, not falling with output size). At >=4x/axis, shrink-then-reduce
+    // is well past its crossover (measured ~1.6x@4x, 2.4x@8x) so route there —
+    // it's a ~6 LSB approximation, so only for big reductions, and only the
+    // whole-image path (tiled stays bit-identical for the pool).
+    // Precedence: heavy-downscale shrink-then-reduce wins even when tiling is
+    // on. They're complementary (shrink cuts compute, tiling bounds memory), but
+    // at >=4x the shrink collapses the source ~k²× so the residual is small and
+    // the per-pull tiling benefit is marginal; the shrink is the dominant win.
+    // (~6 LSB approximation, so heavy ratios only; the bit-identical pool path
+    // uses resizeTileRegion directly, unaffected.)
+    const heavyDownscale = width >= dstWidth * 4 && height >= dstHeight * 4;
+    if (heavyDownscale) {
+      out = resizeThumbnail(src, dstWidth, dstHeight, opts);
+    } else if (tileSize && tileSize > 0) {
+      out = resizeSeparableTiled(src, dstWidth, dstHeight, tileSize, tileSize, opts);
     } else {
-      const src = { data, width, height };
-      // Pure separable Lanczos cost is dominated by the horizontal pass reading
-      // every SOURCE pixel (taps grow as scale shrinks → cost plateaus at heavy
-      // downscale, not falling with output size). At >=4x/axis, shrink-then-reduce
-      // is well past its crossover (measured ~1.6x@4x, 2.4x@8x) so route there —
-      // it's a ~6 LSB approximation, so only for big reductions, and only the
-      // whole-image path (tiled stays bit-identical for the pool).
-      // Precedence: heavy-downscale shrink-then-reduce wins even when tiling is
-      // on. They're complementary (shrink cuts compute, tiling bounds memory), but
-      // at >=4x the shrink collapses the source ~k²× so the residual is small and
-      // the per-pull tiling benefit is marginal; the shrink is the dominant win.
-      // (~6 LSB approximation, so heavy ratios only; the bit-identical pool path
-      // uses resizeTileRegion directly, unaffected.)
-      const heavyDownscale = width >= dstWidth * 4 && height >= dstHeight * 4;
-      if (heavyDownscale) {
-        out = resizeThumbnail(src, dstWidth, dstHeight, opts);
-      } else if (tileSize && tileSize > 0) {
-        out = resizeSeparableTiled(src, dstWidth, dstHeight, tileSize, tileSize, opts);
-      } else {
-        out = resizeSeparable(src, dstWidth, dstHeight, opts);
-      }
+      out = resizeSeparable(src, dstWidth, dstHeight, opts);
     }
     post({ type: 'result', id, params, pixels: out.buffer, dstWidth, dstHeight }, [out.buffer]);
   } catch (error) {

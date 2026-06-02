@@ -1,43 +1,24 @@
-// worker_threads worker for the startup/memory harness. Loads one engine (TS or
-// Wasm), reports `ready` the instant its handler is installed, then on each `job`
-// resizes and reports timing + this worker's process memory (RSS includes Wasm
-// linear memory). The driver (bench-startup.mjs) measures spawn→ready, cold vs
-// warm resize, and the RSS/heap high-water over a run — the numbers that set the
+// worker_threads worker for the startup/memory harness. Loads the TS engine,
+// reports `ready` the instant its handler is installed, then on each `job`
+// resizes and reports timing + this worker's process memory. The driver
+// (bench-startup.mjs) measures spawn→ready, cold vs warm resize, and the
+// RSS/heap high-water over a run — the numbers that set the
 // persistent-cost-vs-respawn-cost balance.
 
 import { parentPort, workerData } from 'node:worker_threads';
 
-const { engine, tsBundlePath, wasmPath } = workerData;
-const KID = { box: 0, triangle: 1, mitchell: 2, lanczos2: 3, lanczos3: 4 };
+const { tsBundlePath } = workerData;
 
 let resizeFn; // (srcU8, w, h, dw, dh) -> Uint8ClampedArray
-let wasm = null;
 
 async function init() {
-  if (engine === 'ts') {
-    const { resizeSeparable } = await import(tsBundlePath);
-    resizeFn = (s, w, h, dw, dh) => resizeSeparable({ data: s, width: w, height: h }, dw, dh, { kernel: 'lanczos2' });
-  } else {
-    const createModule = (await import(wasmPath)).default;
-    wasm = await createModule();
-    resizeFn = (s, w, h, dw, dh) => {
-      const sb = w * h * 4, db = dw * dh * 4;
-      const sp = wasm._malloc(sb);
-      const dp = wasm._malloc(db);
-      wasm.HEAPU8.set(s, sp);
-      wasm._resize_rgba(sp, w, h, dp, dw, dh, KID.lanczos2, 1, 2.2, 0);
-      const o = new Uint8ClampedArray(db);
-      o.set(wasm.HEAPU8.subarray(dp, dp + db));
-      wasm._free(sp);
-      wasm._free(dp);
-      return o;
-    };
-  }
+  const { resizeSeparable } = await import(tsBundlePath);
+  resizeFn = (s, w, h, dw, dh) => resizeSeparable({ data: s, width: w, height: h }, dw, dh, { kernel: 'lanczos2' });
 }
 
 function mem() {
   const m = process.memoryUsage();
-  return { rss: m.rss, heapUsed: m.heapUsed, wasmBytes: wasm ? wasm.HEAPU8.byteLength : 0 };
+  return { rss: m.rss, heapUsed: m.heapUsed };
 }
 
 parentPort.on('message', (msg) => {

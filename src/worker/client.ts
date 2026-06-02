@@ -120,8 +120,8 @@ export class ResizeClient {
  * mark is crossed — the memory-hygiene strategy for a long-lived session (plan
  * §11). Requests are serialized (one in flight) so the recycle, decided after each
  * completed job via {@link shouldRespawn}, always happens between jobs, never
- * mid-flight. `terminate()` drops the whole worker heap (incl. Wasm linear memory)
- * back to the OS — the reclamation the incumbent long-lived service lacks.
+ * mid-flight. `terminate()` drops the whole worker heap back to the OS — the
+ * reclamation the incumbent long-lived service lacks.
  */
 export class ManagedResizeClient {
   private client: ResizeClient;

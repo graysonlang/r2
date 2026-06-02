@@ -1,15 +1,14 @@
-// Apples-to-apples resampler race: our TS/Wasm kernel vs libvips (via sharp),
-// in Node. Isolates the RESAMPLER — raw RGBA buffer in, raw RGBA buffer out, no
+// Apples-to-apples resampler race: our TS kernel vs libvips (via sharp), in
+// Node. Isolates the RESAMPLER — raw RGBA buffer in, raw RGBA buffer out, no
 // file decode/encode — same kernel, linear-light on both sides, single-threaded
 // then matched N-threaded.
 //
-//   node scripts/bench-vips.mjs          (uses SIMD wasm if dist-wasm built)
+//   node scripts/bench-vips.mjs
 //
 // Caveat: this is a Node measurement (sharp is native Node; our kernel normally
 // runs in browser workers). It sizes up the kernel/algorithm gap, not the browser
 // deployment. Fairness notes inline.
 
-import { existsSync } from 'node:fs';
 import * as esbuild from 'esbuild';
 import sharp from 'sharp';
 
@@ -22,10 +21,6 @@ async function importTs(entry) {
 }
 
 const { resizeSeparable, resizeThumbnail } = await importTs('src/separable.ts');
-const wasm = existsSync('dist-wasm/resize.mjs')
-  ? await (await import(process.cwd() + '/dist-wasm/resize.mjs')).default()
-  : null;
-const KID = { box: 0, triangle: 1, mitchell: 2, lanczos2: 3, lanczos3: 4 };
 
 const W = 4096, H = 4096, SCALE = 0.65, KERNEL = 'lanczos2';
 const dw = Math.floor(W * SCALE), dh = Math.floor(H * SCALE);
@@ -59,18 +54,6 @@ function timeSync(fn, runs) {
 // --- ours: TS (single-threaded kernel) ---
 const tsMs = timeSync(() => resizeSeparable(img, dw, dh, { kernel: KERNEL }), RUNS);
 
-// --- ours: Wasm kernel (single-threaded), if built ---
-let wasmMs = NaN;
-if (wasm) {
-  const sb = W * H * 4, db = dw * dh * 4;
-  const sp = wasm._malloc(sb);
-  const dp = wasm._malloc(db);
-  wasm.HEAPU8.set(srcU8, sp);
-  wasmMs = timeSync(() => wasm._resize_rgba(sp, W, H, dp, dw, dh, KID[KERNEL], 1, 2.2, 0), RUNS);
-  wasm._free(sp);
-  wasm._free(dp);
-}
-
 // --- libvips (sharp): raw RGBA in/out, same kernel, linear-light, N threads ---
 // .gamma() makes libvips resize in linear light (its default is non-linear sRGB),
 // matching our pipeline — this is the fair, more-work setting.
@@ -96,10 +79,9 @@ const rate = ms => (mpx / (ms / 1e3)).toFixed(0);
 console.log(`# ${W}² → ${dw}×${dh}, kernel ${KERNEL}, linear-light, raw RGBA in/out`);
 console.log(`# avg of ${RUNS} (drop ${WARMUP}); cores=${cores}; libvips ${sharp.versions.vips}\n`);
 console.log(`ours TS   (1 thread)   ${tsMs.toFixed(1)}ms   ${rate(tsMs)} Mpix/s`);
-if (wasm) console.log(`ours Wasm (1 thread)   ${wasmMs.toFixed(1)}ms   ${rate(wasmMs)} Mpix/s`);
 console.log(`libvips   (1 thread)   ${vips1.toFixed(1)}ms   ${rate(vips1)} Mpix/s`);
 console.log(`libvips   (${cores} threads)  ${vipsN.toFixed(1)}ms   ${rate(vipsN)} Mpix/s`);
-console.log(`\n# single-thread: libvips is ${(tsMs / vips1).toFixed(1)}x our TS, ${(wasmMs / vips1).toFixed(1)}x our Wasm`);
+console.log(`\n# single-thread: libvips is ${(tsMs / vips1).toFixed(1)}x our TS`);
 
 // --- Thumbnail regime: large downscale, where shrink-then-reduce pays off ---
 const TW = 256, TH = 256;

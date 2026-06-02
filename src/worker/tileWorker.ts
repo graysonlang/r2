@@ -2,9 +2,8 @@
 //
 // On `init` it keeps a copy of the source and builds the tiling plan (global
 // weight tables + tile list) once; each `tile` job resamples one output rect via
-// resizeTileRegion and transfers the tile buffer back. Currently runs the TS
-// kernel (bit-identical to the oracle); a Wasm tile path can drop in behind the
-// same protocol later. See src/worker/tileProtocol.ts.
+// resizeTileRegion and transfers the tile buffer back. Runs the TS kernel
+// (bit-identical to the oracle). See src/worker/tileProtocol.ts.
 
 /// <reference lib="webworker" />
 

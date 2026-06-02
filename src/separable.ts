@@ -1,10 +1,9 @@
 // Separable, filtered image downscaler — the general form that supports box,
 // triangle, Mitchell, and Lanczos kernels behind one code path.
 //
-// This is the structure the spec (tiled-scaler-spec.md §5.1) assumes for Phase 3
-// and the eventual Wasm/SIMD kernel. It is a clean-room companion to the fused
-// area resampler in resize.ts (which stays the oracle); this module exists to
-// A/B filter quality and to be the SIMD-friendly base later. Differences from
+// This is the structure the spec (tiled-scaler-spec.md §5.1) assumes for Phase 3.
+// It is a clean-room companion to the fused area resampler in resize.ts (which
+// stays the oracle); this module exists to A/B filter quality. Differences from
 // the fused box:
 //   - Two explicit 1D passes (horizontal then vertical), linear f32 throughout.
 //   - A precomputed per-axis weight table; the kernel only changes the weights,

@@ -43,7 +43,7 @@ export interface Strategy {
 }
 
 /**
- * Choose the resize path from dimensions alone. Engine family (TS/Wasm/SAB) is a
+ * Choose the resize path from dimensions alone. Engine family (TS/SAB) is a
  * separate axis the caller pins; this decides inline-vs-shrink-vs-pool.
  *
  * Order matters: heavy downscale wins first (it collapses the source, so the
